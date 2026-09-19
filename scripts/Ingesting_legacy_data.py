@@ -19,7 +19,7 @@ load_dotenv(project_root / ".env")
 data_path = project_root / "data" / "raw" / "dynamic_supply_chain_logistics_dataset.csv"
 
 # Getting the database credentials
-db_host = os.getenv("SQL_SERVER_HOST", "localhost")
+db_host = os.getenv("SQL_SERVER_HOST_CLOUD", "localhost")
 db_port = os.getenv("SQL_SERVER_PORT", "1433")
 db_user = os.getenv("SQL_ADMIN_USER")
 db_password = os.getenv("SQL_ADMIN_PASSWORD")

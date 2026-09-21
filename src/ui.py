@@ -87,6 +87,37 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+QUESTION_CATALOG = {
+    "🚚 Live Fleet": [
+        "What are the five highest current temperature readings in the active fleet, and where are they located?",
+        "Show the five active fleet records with the highest route-risk index. Include temperature, risk classification, and delay probability.",
+        "How many active records are classified as High Risk and have a delay probability above 0.65?",
+        "Find active fleet records near Los Angeles, around latitude 33.8 and longitude -118.1.",
+        "Which active records currently have a temperature above 4°C?",
+    ],
+    "📘 SOP & Compliance": [
+        "What temperature range must fresh perishables maintain?",
+        "What should a dispatcher do immediately after a critical temperature breach?",
+        "When must a vehicle be diverted to an emergency cold-storage facility?",
+        "What is the difference between a Tier 1 and Tier 2 escalation?",
+        "What combination of risk classification and delay probability triggers Tier 2 escalation?",
+        "What should happen when port congestion near Los Angeles or Long Beach exceeds level 7?",
+    ],
+    "🌦️ Weather & Corridor": [
+        "What are the current weather conditions at latitude 33.8 and longitude -118.1?",
+        "Check the external temperature and wind speed near Los Angeles.",
+        "Does the current wind-based corridor-risk indicator show normal conditions or high disruption at 33.77, -118.19?",
+        "Compare current corridor conditions at 33.77, -118.19 and 34.05, -118.24. Which appears riskier?",
+    ],
+    "🚨 Full Investigation": [
+        "Find active fleet records near Los Angeles, check the current weather there, and determine whether the temperature violates the fresh-perishables SOP. What should the dispatcher do?",
+        "Find the hottest active fleet record, check conditions at its coordinates, and give me the SOP-compliant response if it is above 4°C.",
+        "Identify any High Risk active records with delay probability above 0.65 and explain the required escalation.",
+        "Find active records with port congestion above 7 and tell me what diversion action the SOP requires.",
+        "Investigate the active record with the highest route-risk index. Include its telemetry, local weather, operational risk, and required SOP actions.",
+    ],
+}
+
 # ==========================================
 # 4. MULTI-USER STATE & THREAD MANAGEMENT
 # ==========================================
@@ -108,7 +139,11 @@ with st.sidebar:
     st.image(str(script_dir / "image_L25X5q.png") if (script_dir / "image_L25X5q.png").exists() else "https://cdn-icons-png.flaticon.com/512/2830/2830305.png", width=65)
     st.title("FDE Command Center")
     
-    app_mode = st.radio("System Mode", ["🧊 Dispatch Console", "🛡️ Security & Audit Logs"])
+    app_mode = st.radio(
+        "System Mode",
+        ["🧊 Dispatch Console", "💡 Questions to Try", "🛡️ Security & Audit Logs"],
+        key="app_mode"
+    )
     
     st.markdown("---")
     st.caption(f"Session Token: `{st.session_state.thread_id[:8]}...`")
@@ -122,7 +157,7 @@ with st.sidebar:
         st.rerun()
 
 # ==========================================
-# 6. VIEW ROUTING (DISPATCH VS AUDIT)
+# 6. VIEW ROUTING
 # ==========================================
 
 if app_mode == "🧊 Dispatch Console":
@@ -241,9 +276,50 @@ if app_mode == "🧊 Dispatch Console":
                 st.error(error_fallback)
 
 
+elif app_mode == "💡 Questions to Try":
+    # ------------------------------------------
+    # TAB 2: GUIDED QUESTION CATALOG
+    # ------------------------------------------
+    st.title("💡 Questions to Try")
+    st.caption("Choose a prompt below, copy it, and paste it into the Dispatch Console.")
+
+    st.info(
+        "The agent is designed for cold-chain fleet telemetry, temperature and cargo risk, "
+        "weather/corridor conditions, and SOP or escalation guidance."
+    )
+
+    question_tabs = st.tabs(list(QUESTION_CATALOG.keys()))
+    for question_tab, (category, questions) in zip(question_tabs, QUESTION_CATALOG.items()):
+        with question_tab:
+            st.markdown(f"### {category}")
+            for question_number, question in enumerate(questions, start=1):
+                st.markdown(f"**{question_number}. Suggested prompt**")
+                st.code(question, language="text")
+
+    st.markdown("### Useful follow-up questions")
+    follow_up_col_1, follow_up_col_2 = st.columns(2)
+    with follow_up_col_1:
+        st.markdown(
+            "- Which of those records should I prioritize first, and why?\n"
+            "- What exact SOP rule supports that action?\n"
+            "- Now show only the High Risk results."
+        )
+    with follow_up_col_2:
+        st.markdown(
+            "- Summarize that incident for the night-shift manager.\n"
+            "- What information is still missing before the dispatcher acts?\n"
+            "- Turn the result into a two-step action plan."
+        )
+
+    st.warning(
+        "Out-of-scope requests such as coding help, jokes, personal advice, or unrelated topics "
+        "will be refused by the agent."
+    )
+
+
 elif app_mode == "🛡️ Security & Audit Logs":
     # ------------------------------------------
-    # TAB 2: AUDIT LOG VIEWER (REQUIRES ADMIN CREDENTIALS FROM .ENV OR INPUT)
+    # TAB 3: AUDIT LOG VIEWER (REQUIRES ADMIN CREDENTIALS FROM .ENV OR INPUT)
     # ------------------------------------------
     st.title("🛡️ Enterprise Agent Audit Trail")
     st.caption("Secure database inspection of FDE_VIEWS.AgentAuditLog")

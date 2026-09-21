@@ -34,7 +34,7 @@ from src.orchestrator import fde_agent, get_system_message
 # ==========================================
 db_host = os.getenv("SQL_SERVER_HOST_CLOUD", "localhost")
 db_port = os.getenv("SQL_SERVER_PORT", "1433")
-db_user = os.getenv("SQL_AGENT_USERSQL_VIEW_AI_AGENT_USER", "USR_FDE_RO")
+db_user = os.getenv("SQL_VIEW_AI_AGENT_USER", "USR_FDE_RO")
 db_password = os.getenv("SQL_VIEW_AI_AGENT_PASSWORD")
 
 # Engine for the Agent to write logs using its standard credentials

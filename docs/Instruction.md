@@ -193,8 +193,8 @@ After=network.target
 
 [Service]
 User=ubuntu
-WorkingDirectory=/home/ubuntu/cold-chain-logistics-FDE-Project
-ExecStart=/home/ubuntu/cold-chain-logistics-FDE-Project/venv/bin/streamlit run src/ui.py --server.port=8501 --server.address=0.0.0.0
+WorkingDirectory=/home/ubuntu/Cold-Chain-FDE
+ExecStart=/home/ubuntu/Cold-Chain-FDE/venv/bin/streamlit run src/ui.py --server.port=8501 --server.address=0.0.0.0
 Restart=always
 
 [Install]

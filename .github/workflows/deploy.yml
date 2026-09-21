@@ -16,15 +16,94 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Validate deploy secrets
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          missing=0
+          if [ -z "${EC2_HOST}" ]; then
+            echo "::error::Secret EC2_HOST is empty or not set for this environment."
+            missing=1
+          fi
+          if [ -z "${EC2_USER}" ]; then
+            echo "::error::Secret EC2_USER is empty or not set for this environment."
+            missing=1
+          fi
+          if [ -z "${EC2_SSH_KEY}" ]; then
+            echo "::error::Secret EC2_SSH_KEY is empty or not set for this environment."
+            missing=1
+          fi
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::Fix missing GitHub Environment secrets, then re-run."
+            exit 1
+          fi
+          echo "Deploy secrets are present."
+
+      - name: Check SSH port reachability
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          set -euo pipefail
+          echo "Probing ${EC2_HOST}:22 ..."
+          if ! timeout 20 bash -c "echo >/dev/tcp/${EC2_HOST}/22"; then
+            echo "::error::Cannot reach host on port 22 (connection timed out or refused)."
+            echo "::error::Likely causes: wrong EC2_HOST (stale public IP), instance stopped, no public IP, or network/NACL blocking SSH."
+            echo "::error::Security group alone is not enough if the IP in EC2_HOST is outdated."
+            exit 1
+          fi
+          echo "Port 22 is reachable."
+
       - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          timeout: 2m
+          timeout: 30s
+          command_timeout: 5m
+          script_stop: true
           script: |
-            cd /home/ubuntu/Cold-Chain-FDE
-            git pull origin main
+            set -euo pipefail
+
+            APP_DIR="/home/ubuntu/Cold-Chain-FDE"
+            SERVICE_NAME="streamlit"
+
+            echo "==> Checking app directory"
+            if [ ! -d "$APP_DIR" ]; then
+              echo "::error::App directory not found: $APP_DIR"
+              exit 1
+            fi
+            cd "$APP_DIR"
+
+            echo "==> Pulling latest main"
+            git fetch origin main
+            git pull --ff-only origin main
+
+            echo "==> Activating virtualenv"
+            if [ ! -f "venv/bin/activate" ]; then
+              echo "::error::venv not found at $APP_DIR/venv"
+              exit 1
+            fi
+            # shellcheck disable=SC1091
             source venv/bin/activate
-            sudo systemctl restart streamlit
+
+            echo "==> Restarting $SERVICE_NAME"
+            if ! sudo systemctl restart "$SERVICE_NAME"; then
+              echo "::error::Failed to restart $SERVICE_NAME"
+              sudo systemctl status "$SERVICE_NAME" --no-pager -l || true
+              journalctl -u "$SERVICE_NAME" -n 50 --no-pager || true
+              exit 1
+            fi
+
+            echo "==> Verifying $SERVICE_NAME is active"
+            if ! sudo systemctl is-active --quiet "$SERVICE_NAME"; then
+              echo "::error::$SERVICE_NAME is not active after restart"
+              sudo systemctl status "$SERVICE_NAME" --no-pager -l || true
+              journalctl -u "$SERVICE_NAME" -n 50 --no-pager || true
+              exit 1
+            fi
+
+            echo "Deploy succeeded: $SERVICE_NAME is active."

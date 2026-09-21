@@ -27,7 +27,7 @@ if str(project_root) not in sys.path:
 load_dotenv(project_root / ".env")
 
 # Import the compiled graph and tools list dynamically
-from src.orchestrator import fde_agent
+from src.orchestrator import fde_agent, get_system_message
 
 # ==========================================
 # 2. SQL CREDENTIALS MAPPING FROM .ENV
@@ -96,6 +96,9 @@ if "thread_id" not in st.session_state:
 if "ui_messages" not in st.session_state:
     st.session_state.ui_messages = []
 
+if "system_prompt_seeded" not in st.session_state:
+    st.session_state.system_prompt_seeded = False
+
 thread_config = {"configurable": {"thread_id": st.session_state.thread_id}}
 
 # ==========================================
@@ -115,6 +118,7 @@ with st.sidebar:
     if st.button("🗑️ Purge Dispatch Workspace Session", use_container_width=True):
         st.session_state.ui_messages = []
         st.session_state.thread_id = str(uuid.uuid4())
+        st.session_state.system_prompt_seeded = False
         st.rerun()
 
 # ==========================================
@@ -152,8 +156,14 @@ if app_mode == "🧊 Dispatch Console":
             current_traces = [] 
             
             with st.status("🧠 Initializing Core Reasoner Node...", expanded=True) as status:
+                if not st.session_state.system_prompt_seeded:
+                    turn_messages = [get_system_message(), HumanMessage(content=user_input)]
+                    st.session_state.system_prompt_seeded = True
+                else:
+                    turn_messages = [HumanMessage(content=user_input)]
+
                 events = fde_agent.stream(
-                    {"messages": [HumanMessage(content=user_input)]}, 
+                    {"messages": turn_messages},
                     config=thread_config,
                     stream_mode="updates"
                 )

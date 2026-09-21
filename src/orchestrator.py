@@ -7,7 +7,7 @@ import os
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
-from typing import Annotated, TypedDict
+from typing import Annotated, Optional, TypedDict
 
 # Importing the langchain messages
 from langchain_core.messages import BaseMessage, SystemMessage
@@ -96,27 +96,46 @@ fde_agent = graph_builder.compile(checkpointer=MemorySaver())
 
 
 # ==========================================
-# 4. CHAT LOOP TESTING PANEL
+# 4. SYSTEM PROMPT LOADER
+# ==========================================
+_SYSTEM_INSTRUCTIONS_CACHE: Optional[str] = None
+_PROMPT_FALLBACK = (
+    "You are a Senior Data Scientist for cold-chain logistics. "
+    "Only answer questions about fleet telemetry, corridor conditions, and compliance SOPs."
+)
+
+
+def load_system_instructions() -> str:
+    """Load system prompt text from disk (cached after first successful read)."""
+    global _SYSTEM_INSTRUCTIONS_CACHE
+    if _SYSTEM_INSTRUCTIONS_CACHE is not None:
+        return _SYSTEM_INSTRUCTIONS_CACHE
+
+    prompt_path = project_root / "src" / "prompts" / "system_prompt.txt"
+    try:
+        _SYSTEM_INSTRUCTIONS_CACHE = prompt_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        print(f"Error: Could not find {prompt_path}")
+        _SYSTEM_INSTRUCTIONS_CACHE = _PROMPT_FALLBACK
+    return _SYSTEM_INSTRUCTIONS_CACHE
+
+
+def get_system_message() -> SystemMessage:
+    """Return a SystemMessage with the hardened cold-chain scope instructions."""
+    return SystemMessage(content=load_system_instructions())
+
+
+# ==========================================
+# 5. CHAT LOOP TESTING PANEL
 # ==========================================
 if __name__ == "__main__":
     print("\n" + "="*55)
     print("🚀 FDE Supply Chain Orchestrator State Machine Online")
     print(f"   Configured Execution: [LLM: {AGENT_LLM_SETTING}] -> [Embeddings: {os.getenv('EMBEDDING_MODE', 'LOCAL')}]")
     print("="*55 + "\n")
-    
-    # Load the business-structured system prompt from the external file
-    prompt_path = project_root / "src" / "prompts" / "system_prompt.txt"
-    try:
-        with open(prompt_path, "r", encoding="utf-8") as f:
-            system_instructions = f.read()
-    except FileNotFoundError:
-        print(f"Error: Could not find {prompt_path}")
-        system_instructions = "You are a helpful AI assistant." # Basic fallback
 
-    system_prompt = SystemMessage(content=system_instructions)
-    
     thread_config = {"configurable": {"thread_id": "production_test_1"}}
-    fde_agent.invoke({"messages": [system_prompt]}, config=thread_config)
+    fde_agent.invoke({"messages": [get_system_message()]}, config=thread_config)
     
     while True:
         user_input = input("\nDispatcher > ")
